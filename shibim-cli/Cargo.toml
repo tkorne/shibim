@@ -1,0 +1,16 @@
+[package]
+name = "shibim-cli"
+version = "0.1.0"
+authors = ["tkornem"]
+
+[dependencies.shibim-base]
+path = "../shibim-base"
+version = "0.1.0"
+
+[dependencies.shibim-parse]
+path = "../shibim-parse"
+version = "0.1.0"
+
+[dependencies.shibim-core]
+path = "../shibim-core"
+version = "0.1.0"
