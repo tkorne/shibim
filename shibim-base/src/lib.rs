@@ -224,14 +224,19 @@ impl<'i> std::convert::From<&'i CompiledSong> for SongRef<'i>{
         }
     }
 }
+#[derive(Debug)]
+pub struct  SHBParseError{
+    pub loc : std::ops::Range<usize>,
+    pub msg : String
+}
 
-enum ParseSongWarnings{
+pub enum ParseSongWarnings{
     RepeatedSectionName,
     UnNamed,
     NoTonic
 }
 
-enum ParseListWarnings{
+pub enum ParseListWarnings{
     SongNotFound(String),
     SongSectionsNotFound(Vec<String>),
     FirstJoined,

@@ -9,7 +9,7 @@ use std::collections::HashSet;
 //The thing that makes rustc choke :c
 
 //TODO: box parser into some interface
-pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, std::vec::Vec<Cheap<char>>>{
+pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, Vec<SHBParseError>>{
         //Maybe some more efficient way
     let vec_to_string = |s : Vec<char>|s.into_iter().collect::<String>().trim().to_owned();
     let ident = 
@@ -507,5 +507,10 @@ pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, std::vec::V
             }
         });
 
-    song.parse(s)
+    song.parse(s).map_err(|errvec| 
+        errvec.iter().map(|e|SHBParseError{
+            loc : e.span(),
+            msg : e.label().unwrap_or("").to_owned()
+        }).collect()
+    )
 }
