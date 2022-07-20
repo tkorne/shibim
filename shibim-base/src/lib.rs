@@ -229,10 +229,12 @@ pub struct  SHBParseError{
     pub loc : std::ops::Range<usize>,
     pub msg : String
 }
-
+#[derive(Debug)]
 pub enum ParseSongWarnings{
-    RepeatedSectionName,
+    RepeatedSectionName(String),
+    SectionNotFound(String),
     UnNamed,
+    WrongTonicFormat,
     NoTonic
 }
 
@@ -241,6 +243,17 @@ pub enum ParseListWarnings{
     SongSectionsNotFound(Vec<String>),
     FirstJoined,
     UnknownSongArgs(String)
+}
+pub struct SongSessionInfo{
+    pub cur_file : Option<std::path::PathBuf>,
+}
+
+impl SongSessionInfo{
+    pub fn emit_warning(&self,warning : ParseSongWarnings){
+        if let Some(cur_file) = &self.cur_file{
+            eprintln!("{}: {:?}",cur_file.display(),warning);
+        }
+    }
 }
 /*
 impl std::convert::From<&Song> for SongRef{

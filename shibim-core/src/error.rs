@@ -21,11 +21,7 @@ pub struct VisitorError{
 pub enum LoadErrorPayload{
     #[error(transparent)]
     IOError(#[from]std::io::Error),
-    #[error("Synax error '{0:?}'")] //Todo, this is duct tape
+    #[error("Synax error(s) '{0:?}'")] //Todo, this is duct tape
     ParseError(Vec<SHBParseError>)
 }
 
-struct SessionInfo{
-    cur_file : Option<PathBuf>,
-    load_errors : Vec<LoadError>
-}

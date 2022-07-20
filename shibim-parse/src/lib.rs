@@ -9,7 +9,7 @@ use std::collections::HashSet;
 //The thing that makes rustc choke :c
 
 //TODO: box parser into some interface
-pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, Vec<SHBParseError>>{
+pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result<shibim_base::Song, Vec<SHBParseError>>{
         //Maybe some more efficient way
     let vec_to_string = |s : Vec<char>|s.into_iter().collect::<String>().trim().to_owned();
     let ident = 
@@ -304,7 +304,6 @@ pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, Vec<SHBPars
         .map(|mut arr|{
             let mut has_chords = false;
             let mut has_lyrics = false;
-            println!("{:?}",arr);
         for imeasure in arr.iter().flatten(){
                 for (ichords,ilyrics) in imeasure{
                     if ichords.is_some(){
@@ -356,8 +355,8 @@ pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, Vec<SHBPars
                     Line::Chords(
                         arr.drain(0..).map(|imeasure| match imeasure{
                             None => None,
-                            Some(mut x) => Some(x.drain(0..).map(
-                                |(ichords,_lyrics)|ichords.unwrap()
+                            Some(mut ameasure) => Some(ameasure.drain(0..).map(
+                                |(ichords,_lyrics)|ichords.unwrap_or_default()
                             ).collect::<Vec<Vec<MusicEvent>> >())
                         }).collect::<Vec<_>>()
                     )
@@ -444,8 +443,7 @@ pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, Vec<SHBPars
                     if section.subsections.is_empty(){
                         full_order.push(*previous);
                     }else{
-                        eprintln!("Section with same name, ignoring!");
-                        //TODO: propagate error correctly
+                        session.emit_warning(ParseSongWarnings::RepeatedSectionName(section.name.clone()));
                     }
                 }else{
                     section_names.insert(section.name.clone(), i);
@@ -465,7 +463,7 @@ pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, Vec<SHBPars
                             tonic = atonic;
                             tonic_kind = akind;
                         }else{
-                            eprintln!("Error parsing tonic"); //TODO
+                            session.emit_warning(ParseSongWarnings::WrongTonicFormat);
                         }
                     }
                     "ord" | "order" =>{
@@ -474,7 +472,7 @@ pub fn parse_song(s: &str) -> std::result::Result<shibim_base::Song, Vec<SHBPars
                                 if let Some(u) = section_names.get(x) {
                                     Some(*u)
                                 }else{
-                                    eprintln!("Cannot find section {}",x);
+                                    session.emit_warning(ParseSongWarnings::SectionNotFound(x.clone()));
                                     None
                                 }
                                 
