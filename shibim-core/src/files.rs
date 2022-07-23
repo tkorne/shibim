@@ -78,6 +78,8 @@ pub struct SHBBatchResults{
     pub errors : Vec<LoadError>,
     pub names : HashMap<String,usize>
 }
+
+
 trait SongVisitor{
     fn process(&mut self, e : &Song) -> Result<(),VisitorError>;
 }

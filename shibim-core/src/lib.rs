@@ -7,3 +7,4 @@ pub mod toneutil;
 pub mod files;
 pub mod error;
 pub mod util;
+pub mod parser;

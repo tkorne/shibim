@@ -9,7 +9,7 @@ fn main(){
             println!("{}",e);
         }
         Ok(uk) =>{
-            println!("{:?}",uk.names);
+            println!("{:?}",uk.errors);
         }
     }  
 }

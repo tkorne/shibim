@@ -29,7 +29,7 @@ pub enum FormatSize{
 }
 
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Default)]
 pub struct Song{
     pub name: String,
     pub tonic : NoteHeight,
@@ -65,7 +65,7 @@ pub struct SectionName{
     pub version : String,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Default)]
 pub struct Section{
     pub name : String,
     pub description : String,
@@ -74,7 +74,7 @@ pub struct Section{
     //pub metadata : HashMap<String,String>
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Default)]
 pub struct Subsection{
     pub metadata : HashMap<String,String>,
     pub lines : Vec<Line>
@@ -87,9 +87,9 @@ type MixedEventList = (Vec<MusicEvent>,Vec<LyricEvent>);
 
 #[derive(Debug,Clone)]
 pub enum Line{
-    Lyrics  (Vec< Option< Vec<  Vec<LyricEvent> >>>),
-    Chords  (Vec< Option< Vec<  Vec<MusicEvent> >>>),
-    Mixed   (Vec< Option< Vec< MixedEventList >>>)
+    Lyrics  (Vec< Vec<  Vec<LyricEvent> >>),
+    Chords  (Vec< Vec<  Vec<MusicEvent> >>),
+    Mixed   (Vec< Vec< MixedEventList >>)
 }
 #[derive(Debug,Clone)]
 pub enum LyricEvent{
@@ -186,6 +186,11 @@ impl std::convert::From<Song> for CompiledSong{
             bpm : item.bpm,
             sections : item.sections
         }
+    }
+}
+impl Default for TonicKind {
+    fn default() -> Self {
+        TonicKind::Major
     }
 }
 impl std::convert::From<&Song> for CompiledSong{

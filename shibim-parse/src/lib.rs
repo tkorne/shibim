@@ -13,17 +13,17 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
         //Maybe some more efficient way
     let vec_to_string = |s : Vec<char>|s.into_iter().collect::<String>().trim().to_owned();
     let ident = 
-        filter::<_,_,Cheap<char>>(|c :&char|c.is_alphanumeric())
+        filter::<_,_,Simple<char>>(|c :&char|c.is_alphanumeric() || *c == '_')
         .repeated().at_least(1)
         .padded_by(just(' ').repeated())
         .map(vec_to_string);
     let meta_arg =
-        none_of::<_,_,Cheap<char>>("\n|\r")
+        none_of::<_,_,Simple<char>>("\n|\r")
         .repeated()
         .collect::<String>()
         .map(|x|x.trim().to_owned());
     let meta_arg_yesbar =
-        none_of::<_,_,Cheap<char>>("\n\r")
+        none_of::<_,_,Simple<char>>("\n\r")
         .repeated()
         .collect::<String>()
         .map(|x|x.trim().to_owned());
@@ -43,12 +43,12 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
     
     
     let section_name_noparse = 
-        filter::<_,_,Cheap<char>>(|c : &char|c.is_alphabetic())
+        filter::<_,_,Simple<char>>(|c : &char|c.is_alphabetic())
         .repeated().at_least(1)
         .chain::<char,Vec<char>,_>(
             filter(|x : &char|x.is_digit(10)).repeated().at_most(3)
         ).chain::<char,Vec<char>,_>(
-            filter(|x: &char|x.is_alphanumeric())
+            filter(|x: &char|x.is_alphanumeric() || *x == '~')
             .repeated()
         ).collect::<String>();
     let section_order =
@@ -60,7 +60,7 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
         .padded();
         /*
     let section_name = 
-        filter::<_,_,Cheap<char>>(|c : &char|c.is_alphabetic())
+        filter::<_,_,Simple<char>>(|c : &char|c.is_alphabetic())
         .repeated().at_least(1).collect::<String>()
         .then(
             filter(|x : &char|x.is_digit(10)).repeated().at_most(3)
@@ -72,13 +72,13 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
         ).map(|((k,n),v)| SectionName{kind:k,number:n,version:v});*/
     
     let section_header = 
-        just::<_,_,Cheap<char>>('@')
+        just::<_,_,Simple<char>>('@')
         .ignore_then(section_name_noparse)
         .then(meta_arg);
     
     //the first text of a line can't have --
     let first_lyric_text = 
-        just::<_,_,Cheap<char>>('^').map(|_|LyricEvent::LyricBreak).or(
+        just::<_,_,Simple<char>>('^').map(|_|LyricEvent::LyricBreak).or(
             none_of("@|^\n\r·*`´-")
             .chain(
                 none_of("|^\n\r·*`´")
@@ -98,17 +98,17 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
             .map(|(mut x,mut y)|LyricEvent::LyricText(x.drain(0..).chain(y.drain(0..)).collect::<String>() ))
         ).repeated().at_least(1);
     let lyric_text =
-        just::<_,_,Cheap<char>>('^').map(|_|LyricEvent::LyricBreak).or(
+        just::<_,_,Simple<char>>('^').map(|_|LyricEvent::LyricBreak).or(
             none_of("|^\n\r·*`´")
             .repeated().at_least(1)
             .collect::<String>()
             .map(LyricEvent::LyricText)
         ).repeated().at_least(1);
     //TODO: Check ranges
-    let short_uint = text::digits::<_,Cheap<char>>(10).map(|x|x.parse::<u8>().unwrap_or(0));
-    let short_int = text::digits::<_,Cheap<char>>(10).map(|x|x.parse::<i8>().unwrap_or(0));
+    let short_uint = text::digits::<_,Simple<char>>(10).map(|x|x.parse::<u8>().unwrap_or(0));
+    let short_int = text::digits::<_,Simple<char>>(10).map(|x|x.parse::<i8>().unwrap_or(0));
     let time_fraction = 
-        just::<_,_,Cheap<char>>('+')
+        just::<_,_,Simple<char>>('+')
         .ignore_then(short_uint)
         .then_ignore(just(','))
         .then(short_uint)
@@ -139,7 +139,7 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
         );
     //TODO?: Double accidentals are not supported
     let chord_root =
-        one_of::<_,_,Cheap<char>>("ABCDEFG").map(|c| CHAR_TONIC_VALUES [((c as u32 -'A' as u32) % 7) as usize])
+        one_of::<_,_,Simple<char>>("ABCDEFG").map(|c| CHAR_TONIC_VALUES [((c as u32 -'A' as u32) % 7) as usize])
         .then(one_of("#b").or_not())
         .map(|(root,alt)|
             if let Some(alt) = alt {
@@ -161,20 +161,20 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
             Some(_)=> ((root+3)%12,TonicKind::Minor),
             _ => (root,TonicKind::Major)
         }));
-    let keyword = just::<char,_,Cheap<char>>;
-    let chord_kind_alteration = choice::<_,Cheap<char>>((
+    let keyword = just::<char,_,Simple<char>>;
+    let chord_kind_alteration = choice::<_,Simple<char>>((
         keyword("no").to(ChordAlterationKind::No),
         keyword("b").to(ChordAlterationKind::Flat),
         keyword("#").to(ChordAlterationKind::Sharp)
     ));
-    let chord_num_alteration = choice::<_,Cheap<char>>((
+    let chord_num_alteration = choice::<_,Simple<char>>((
         keyword("13").to(13),
         keyword("11").to(11),
-        filter::<_,_,Cheap<char>>(|c:&char|c.is_digit(10))
+        filter::<_,_,Simple<char>>(|c:&char|c.is_digit(10))
             .map(|x| (x as u32 - '0' as u32)as u8)
     ));
     let chord_keyword = 
-        choice::<_,Cheap<char>>( (
+        choice::<_,Simple<char>>( (
             keyword("sus4").to(ChordKeyword::Sus4),
             keyword("sus2").to(ChordKeyword::Sus2),
             keyword("add4").to(ChordKeyword::Add4),
@@ -230,14 +230,14 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
             time
         });
     
-    let music_event = choice::<_,Cheap<char>>((
+    let music_event = choice::<_,Simple<char>>((
         chord.clone().map(MusicEvent::ChordEvent),
 
         simple_melody.map(MusicEvent::MelodyEvent),
 
         keyword("%").to(MusicEvent::RepeatMeasure),
 
-        none_of::<_,_,Cheap<char>>("\"\n").repeated()
+        none_of::<_,_,Simple<char>>("\"\n").repeated()
             .delimited_by(just("\""),just("\""))
             .collect::<String>().map(MusicEvent::Annotation),
         
@@ -249,7 +249,7 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
         
         keyword(")").to(MusicEvent::CloseParen),
         
-        text::int::<_,Cheap<char>>(10)
+        text::int::<_,Simple<char>>(10)
             .map(|x|MusicEvent::NumberedMeasure(x.parse::<u16>().unwrap())) //TODO: bounds
     ));
 
@@ -332,8 +332,8 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
                     #[allow(clippy::manual_map)] //The None's are there if one needs to change space behaviour
                     Line::Mixed(
                         arr.drain(0..).map(|imeasure| match imeasure{
-                            None => None,
-                            Some(mut x) => Some(x.drain(0..).map(|(ichords,ilyrics)|{
+                            None => Vec::new(),
+                            Some(mut x) => x.drain(0..).map(|(ichords,ilyrics)|{
                                 if let Some(ichords) = ichords {
                                     if let Some(ilyrics) = ilyrics {
                                         (ichords,ilyrics)
@@ -346,7 +346,7 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
                                     unreachable!();
                                     //(Vec::new(),Vec::new())
                                 }
-                            }).collect::<Vec<(Vec<MusicEvent>,Vec<LyricEvent>)> >())
+                            }).collect::<Vec<(Vec<MusicEvent>,Vec<LyricEvent>)> >()
                         }).collect::<Vec<_>>()
                     )
                 }
@@ -354,10 +354,10 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
                     #[allow(clippy::manual_map)] 
                     Line::Chords(
                         arr.drain(0..).map(|imeasure| match imeasure{
-                            None => None,
-                            Some(mut ameasure) => Some(ameasure.drain(0..).map(
+                            None => Vec::new(),
+                            Some(mut ameasure) => ameasure.drain(0..).map(
                                 |(ichords,_lyrics)|ichords.unwrap_or_default()
-                            ).collect::<Vec<Vec<MusicEvent>> >())
+                            ).collect::<Vec<Vec<MusicEvent>> >()
                         }).collect::<Vec<_>>()
                     )
                 },
@@ -365,10 +365,10 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
                     #[allow(clippy::manual_map)] 
                     Line::Lyrics(
                         arr.drain(0..).map(|imeasure| match imeasure{
-                            None => None,
-                            Some(mut x) => Some(x.drain(0..).map(
+                            None => Vec::new(),
+                            Some(mut x) => x.drain(0..).map(
                                 |(_chords,ilyrics)|ilyrics.unwrap()
-                            ).collect::<Vec<Vec<LyricEvent>> >())
+                            ).collect::<Vec<Vec<LyricEvent>> >()
                         }).collect::<Vec<_>>()
                     )
                 }
@@ -506,9 +506,14 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
         });
 
     song.parse(s).map_err(|errvec| 
-        errvec.iter().map(|e|SHBParseError{
-            loc : e.span(),
-            msg : e.label().unwrap_or("").to_owned()
+        errvec.iter().map(|e|{
+            println!("{:?}",e);
+            println!("{:?}",&s[e.span().start..]);
+            println!("{:?}",s);
+            SHBParseError{
+                loc : e.span(),
+                msg : s[e.span()].to_owned()
+            }
         }).collect()
     )
 }

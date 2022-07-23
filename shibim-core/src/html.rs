@@ -136,23 +136,15 @@ markup::define!(
             base::Line::Lyrics(lyrics)=>{
                 $"u-l" . lyr {
                 @for measure in lyrics{
-                    @match measure{
-                        Some(measure)=>{
-                            $"u-m"{
-                            @for block in measure{
-                                $"u-b"{
-                                $"u-y"{
-                               
-                                    @for fragment in block{
-                                        {LyricEvent{evt : fragment}}
-                                    }
-                                }
+                    $"u-m"{
+                        @for block in measure{
+                            $"u-b"{
+                            $"u-y"{
+                           
+                                @for fragment in block{
+                                    {LyricEvent{evt : fragment}}
                                 }
                             }
-                            }
-                        }
-                        None =>{
-                            $"u-m" . empty{
                             }
                         }
                     }
@@ -163,28 +155,19 @@ markup::define!(
                 @let mut on_parens = false;
                 $"u-l" . chr {
                 @for measure in chords{
-                    @match measure{
-                        Some(measure)=>{
-                            $"u-m"{
-                            @for block in measure{
-                                $"u.b"{
-                                    $"u-c"{
-                                    @for fragment in block{
-                                        @if let base::MusicEvent::OpenParen = fragment{
-                                            {on_parens = true;""}
-                                        }else if let base::MusicEvent::CloseParen = fragment{
-                                            {on_parens = false;""}
-                                        }
-                                        {MusicEvent{evt : fragment, use_flats : *use_flats, is_par: on_parens}}
+                    $"u-m"{
+                        @for block in measure{
+                            $"u.b"{
+                                $"u-c"{
+                                @for fragment in block{
+                                    @if let base::MusicEvent::OpenParen = fragment{
+                                        {on_parens = true;""}
+                                    }else if let base::MusicEvent::CloseParen = fragment{
+                                        {on_parens = false;""}
                                     }
-                                    }
+                                    {MusicEvent{evt : fragment, use_flats : *use_flats, is_par: on_parens}}
                                 }
-                            }
-                            }
-                        }
-                        None =>{
-                            $"u-m" . empty{
-
+                                }
                             }
                         }
                     }
@@ -195,35 +178,27 @@ markup::define!(
                 @let mut on_parens = false;
                 $"u-v" {
                 @for measure in elems{
-                    @match measure{
-                        Some(measure)=>{
-                            $"u-m"{
-                            @for (chord_block,lyric_block) in measure{
-                                $"u-b"{
-                                    $"u-c"{
-                                        @for evt in chord_block{
-                                            @if let base::MusicEvent::OpenParen = evt{
-                                                {on_parens = true;""}
-                                            }else if let base::MusicEvent::CloseParen = evt{
-                                                {on_parens = false;""}
-                                            }
-                                            {MusicEvent{evt, use_flats : *use_flats,is_par : on_parens}}
+                    $"u-m"{
+                        @for (chord_block,lyric_block) in measure{
+                            $"u-b"{
+                                $"u-c"{
+                                    @for evt in chord_block{
+                                        @if let base::MusicEvent::OpenParen = evt{
+                                            {on_parens = true;""}
+                                        }else if let base::MusicEvent::CloseParen = evt{
+                                            {on_parens = false;""}
                                         }
+                                        {MusicEvent{evt, use_flats : *use_flats,is_par : on_parens}}
                                     }
-                                    $"u-l"{
-                                        @for evt in lyric_block{
-                                            {LyricEvent{evt}}
-                                        }
+                                }
+                                $"u-l"{
+                                    @for evt in lyric_block{
+                                        {LyricEvent{evt}}
                                     }
                                 }
                             }
-                            }
                         }
-                        None =>{
-                            $"u-m" . empty{
-                            }
                         }
-                    }
                 }
                 }
             }
