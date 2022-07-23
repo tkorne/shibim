@@ -1,6 +1,6 @@
 use shibim_base::*;
 
-#[derive(PartialEq,Eq)]
+#[derive(PartialEq,Eq,Debug)]
 enum ParsingState{
     MetaStart,
     MetaArg,
@@ -19,7 +19,7 @@ enum ParsingState{
     SubsectionMetaArg,
     SubsectionMetaVal
 }
-#[derive(PartialEq,Eq)]
+#[derive(PartialEq,Eq,Debug)]
 enum ParserStatus{
     New,
     Processing,
@@ -103,6 +103,34 @@ macro_rules! buffer_block {
     };
 }
 
+macro_rules! parse_lyric_buffer {
+    ($self:expr) => {
+        {
+            let mut fragment_start : usize = 0;
+            for (i,c) in $self.lyric_buffer.char_indices(){
+                if c == '^'{
+                    if i > fragment_start{
+                        let slice = &$self.lyric_buffer[fragment_start..i];
+                        buffer_block!($self).1.push(
+                            LyricEvent::LyricText(
+                                slice.to_owned()
+                            )
+                        );
+                        //Caret has length 1
+                        fragment_start = i + 1;
+                    }
+                    buffer_block!($self).1.push(LyricEvent::LyricBreak);
+                }
+            }
+            if fragment_start < $self.lyric_buffer.len(){
+                buffer_block!($self).1.push(
+                    LyricEvent::LyricText(consume_str!( $self.lyric_buffer, $self.lyric_buffer[fragment_start..]))
+                );
+            }
+        }
+    };
+}
+
 
 impl Parser{
     pub fn parse_char(&mut self,c : char){
@@ -118,6 +146,7 @@ impl Parser{
         
         while retry {
             retry = false;
+            println!("{}→{:?}",c,self.state);
             match self.state{
                 MetaStart => match c{
                     _ if c.is_whitespace()=>{
@@ -163,11 +192,11 @@ impl Parser{
                     '\n' =>{
                         let trim_arg = self.meta_arg_buffer.trim();
                         if trim_arg.is_empty(){
-                            eprintln!("Empty metadata argument");
+                            eprintln!("Empty metadata name");
                         }
                         let trim_val = self.meta_val_buffer.trim();
                         if trim_val.is_empty(){
-                            eprintln!("Empty metadata argument");
+                            eprintln!("Empty metadata value");
                         }
                         self.song.metadata.insert(
                             consume_str!(self.meta_arg_buffer,trim_arg),
@@ -177,7 +206,7 @@ impl Parser{
                     }
                 
                     _=>{
-                        self.meta_arg_buffer.push(c);
+                        self.meta_val_buffer.push(c);
 
                     }
                 }
@@ -222,9 +251,9 @@ impl Parser{
                 SectionHeadDesc => match c{
                     '\n' => {
                         let desc_trim = self.section_desc_buffer.trim();
-                        last_section!(self).name =
+                        last_section!(self).description =
                             consume_str!(self.section_desc_buffer,desc_trim);
-                        self.state = LineStart;
+                        self.state = SubsectionStart;
                     }
 
                     _ => {
@@ -275,27 +304,7 @@ impl Parser{
                 MaybeLyricBlock => match c{
                     '\n' => {
                         //Parse delayed string
-                        let mut fragment_start : usize = 0;
-                        for (i,c) in self.lyric_buffer.char_indices(){
-                            if c == '^'{
-                                if i > fragment_start{
-                                    let slice = &self.lyric_buffer[fragment_start..i];
-                                    buffer_block!(self).1.push(
-                                        LyricEvent::LyricText(
-                                            slice.to_owned()
-                                        )
-                                    );
-                                    //Caret has length 1
-                                    fragment_start = i + 1;
-                                }
-                                buffer_block!(self).1.push(LyricEvent::LyricBreak);
-                            }
-                        }
-                        if fragment_start < self.lyric_buffer.len(){
-                            buffer_block!(self).1.push(
-                                LyricEvent::LyricText(consume!(self.lyric_buffer))
-                            );
-                        }
+                        parse_lyric_buffer!(self);
 
                         self.state = LineEnd;
                         retry = true;
@@ -306,9 +315,11 @@ impl Parser{
                         self.state = TrueLyricBlock;
                     }
                     '|' => {
+                        parse_lyric_buffer!(self);
                         self.state = MeasureStart;
                     }
                     '´' | '`' =>{
+                        parse_lyric_buffer!(self);
                         self.state = BlockStart;
                     }
                     _=>{
@@ -318,9 +329,21 @@ impl Parser{
 
                 TrueLyricBlock => match c{
                     '|' => {
+                        buffer_block!(self).1.push(
+                            LyricEvent::LyricText(consume!(self.lyric_buffer))
+                        );
+                        buffer_block!(self).0.push(
+                            MusicEvent::Annotation(consume!(self.chord_buffer)) //TODO: STUB
+                        );
                         self.state = MeasureStart;
                     }
                     '´' | '`' =>{
+                        buffer_block!(self).1.push(
+                            LyricEvent::LyricText(consume!(self.lyric_buffer))
+                        );
+                        buffer_block!(self).0.push(
+                            MusicEvent::Annotation(consume!(self.chord_buffer)) //TODO: STUB
+                        );
                         self.state = BlockStart;
                     }
                     '·' | '*' =>{
@@ -469,7 +492,7 @@ impl Parser{
                     }
                 
                     _=>{
-                        self.meta_arg_buffer.push(c);
+                        self.meta_val_buffer.push(c);
 
                     }
                 }
@@ -483,10 +506,18 @@ impl Parser{
             self.line_has_content = true;
         }
     }
+    pub fn parse_str(&mut self, s: &str){
+        for c in s.chars(){
+            self.parse_char(c);
+        }
+    }
     pub fn finalize(&mut self){
         self.parse_char('\n');
         if self.status != ParserStatus::Error{
             self.status = ParserStatus::Completed;
         }
+    }
+    pub fn extract(self)->Song{
+        self.song
     }
 } 
