@@ -26,7 +26,7 @@ enum ParserStatus{
     Completed,
     Error
 }
-pub struct Parser{
+pub struct SHBParser{
     line : usize,
     line_has_content : bool,
     meta_arg_buffer : String,
@@ -41,9 +41,9 @@ pub struct Parser{
     song : Song
 }
 
-impl Default for Parser {
+impl Default for SHBParser {
     fn default() -> Self {
-        Parser{
+        SHBParser{
             line : 0,
             line_has_content : false,
             meta_arg_buffer : String::new(),
@@ -132,7 +132,7 @@ macro_rules! parse_lyric_buffer {
 }
 
 
-impl Parser{
+impl SHBParser{
     pub fn parse_char(&mut self,c : char){
         if let ParserStatus::New = self.status{
             self.status = ParserStatus::Processing;
@@ -521,3 +521,165 @@ impl Parser{
         self.song
     }
 } 
+
+pub fn parse_tone_root(s : &str)->Option<(u8,&str)>{
+    let mut it = s.chars();
+    let first = it.next()?;
+    let value : u8 = match first {
+        'C' => 0,
+        'D' => 2,
+        'E' => 4,
+        'F' => 5,
+        'G' => 7,
+        'A' => 9,
+        'B' => 11,
+        _ => {
+            return None
+        }
+    };
+    if let Some(second) = it.next(){
+        match second{
+            '#' => {
+                Some((value + 1,&s[2..]))
+            }
+            'b' => {
+                Some((value - 1,&s[2..]))
+            }
+            _=>{
+                Some((value,&s[1..]))
+            }
+        }
+    }else{
+        Some((value,&s[1..]))
+    }
+}
+
+pub fn parse_chord<'i>(s : &'i str)->Option<(ChordEvent,&'i str)>{
+    let (root,mut s) = parse_tone_root(s)?;
+    let mut kind = ChordKind::Major;
+    let mut modifiers:Vec<ChordModifier> = Vec::new();
+    let mut bass = None;
+    if let Some('m') = s.chars().next(){
+        kind = ChordKind::Minor;
+        s = &s[1..];
+    }
+
+    loop{
+        if let Some((modifier,ns)) = parse_keyword(s)  {
+            s = ns;
+            modifiers.push(modifier)
+        }else {
+            match s.chars().next() {
+                Some('(')|Some(')')=>{
+                    //Todo: actually check parens?
+                    s = &s[1..];
+                }
+                _=>{
+                    break;
+                }
+            }
+        }
+    }
+    match s.chars().next(){
+        Some('\'') | Some('/') =>{
+            if let Some((nbass,ns))=  parse_tone_root(&s[1..]){
+                s = ns;
+                bass = Some(nbass);
+            }
+        }
+        _=>{}
+    }
+    Some(
+        (ChordEvent{
+            root,
+            kind,
+            modifier : modifiers,
+            time : None,
+            bass
+        },s)
+    )
+}
+
+macro_rules! seek_cascade {
+
+    ($s:expr, $key:expr => $value:expr ) => {
+        {
+            seek($s,$key).map(|ns|($value,ns))
+        }
+    };
+
+    ($s:expr, $key:expr => $value:expr, $($k:expr => $v:expr),+ ) => {
+        {
+            if let Some(ns) = seek($s,$key){
+                Some(($value,ns))
+            }else{
+                seek_cascade!($s,$($k => $v),+)
+            }
+        }
+    };
+}
+
+pub fn parse_keyword<'i>(s : &'i str) -> Option<(ChordModifier,&'i str)>{
+    use ChordModifier::*;
+    use ChordKeyword::*;
+
+    //This is understandable and simple, but expensive
+    if let Some(u) = seek_cascade!(s,
+        "add11" => Keyword(Add11),
+        "add2" => Keyword(Add2),
+        "add4" => Keyword(Add4),
+        "add9" => Keyword(Add9),
+        "sus2" => Keyword(Sus2),
+        "sus4" => Keyword(Sus4),
+        "Maj" => Keyword(Maj),
+        "6/9" => Keyword(K69),
+        "aug" => Keyword(Aug),
+        "dim" => Keyword(Dim),
+        "11" => Keyword(K11),
+        "13" => Keyword(K13),
+        "9" => Keyword(K9), //woof
+        "7" => Keyword(K7),
+        "6" => Keyword(K6),
+        "5" => Keyword(K5)
+    ){
+        return Some(u)
+    }
+
+    if let Some((kind,ns)) = seek_cascade!(s,
+        "no" => ChordAlterationKind::No,
+        "b" => ChordAlterationKind::Flat,
+        "#" => ChordAlterationKind::Sharp
+    ){
+        let may_digits = 
+            ns.get(..2)
+            .and_then(
+                |num_str|num_str.parse::<u8>().ok()
+            ).or_else(||
+                ns.get(..1)
+                .and_then(
+                    |num_str|num_str.parse::<u8>().ok()
+                )
+            );
+
+        if let Some(degree) = may_digits{
+            let delta = degree/10 + 1;
+            return Some((Alteration(
+                ChordAlteration{
+                    kind,
+                    degree
+                }
+            ),&ns[delta as usize..]))
+        }
+    }
+    None
+}
+
+
+fn seek<'i>(s : &'i str,pattern : &str)->Option<&'i str>{
+    let subs = s.get(..pattern.len())?;
+    if subs != pattern{
+        None
+    }else{
+        Some(&s[pattern.len()..])
+    }
+}
