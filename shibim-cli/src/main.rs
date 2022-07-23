@@ -29,5 +29,5 @@ The other |line |C·is ^chord only
 This is ^lyric only
 "#);
     println!("{:#?}",u.extract());
-    println!("{:?}",core::parser::parse_chord("Dm7b5add2#11/G#potato"));
+    println!("{:?}",core::parser::parse_chord("5+7,2Dm7b5add2#11/G#potato"));
 }

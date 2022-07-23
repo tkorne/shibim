@@ -554,7 +554,14 @@ pub fn parse_tone_root(s : &str)->Option<(u8,&str)>{
     }
 }
 
+//This one is ugly, maybe refactor
 pub fn parse_chord<'i>(s : &'i str)->Option<(ChordEvent,&'i str)>{
+    let mut s = s;
+    let mut time = None;
+    if let Some((ntime,ns)) = parse_time_offset(s){
+        time = Some(ntime);
+        s = ns;
+    }
     let (root,mut s) = parse_tone_root(s)?;
     let mut kind = ChordKind::Major;
     let mut modifiers:Vec<ChordModifier> = Vec::new();
@@ -593,13 +600,51 @@ pub fn parse_chord<'i>(s : &'i str)->Option<(ChordEvent,&'i str)>{
         (ChordEvent{
             root,
             kind,
-            modifier : modifiers,
-            time : None,
+            modifiers,
+            time,
             bass
         },s)
     )
 }
 
+pub fn parse_time_offset(s: &str)->Option<(TimeOffset,&str)>{
+    let mut s = s;
+    let cur_char =  s.chars().next()?;
+    let mut neg:i8 = 1;
+    if cur_char == '<' {
+        return Some((TimeOffset{
+            beat : -1,
+            num : 1,
+            den : 2
+        },&s[1..]));
+    }
+    if cur_char == '-'{
+        neg = -1;
+        s = &s[1..];
+    }
+    let (beat,s) = parse_uint_until(s)?;
+    let beat = ((beat % 128) as i8)*neg;
+
+    if let Some('+') =  s.chars().next(){
+        if let Some ((num,ns)) = parse_uint_until(&s[1..]){
+            if let Some(',') =  ns.chars().next(){
+                if let Some((den,s)) = parse_uint_until(&ns[1..]){
+                    return Some((TimeOffset{
+                        beat,
+                        num : num as u8,
+                        den : den as u8
+                    },s))
+                }
+            }
+        }
+    }
+
+    Some((TimeOffset{
+        beat,
+        num : 0,
+        den : 1
+    },s))
+}
 macro_rules! seek_cascade {
 
     ($s:expr, $key:expr => $value:expr ) => {
@@ -682,4 +727,17 @@ fn seek<'i>(s : &'i str,pattern : &str)->Option<&'i str>{
     }else{
         Some(&s[pattern.len()..])
     }
+}
+
+pub fn parse_uint_until(s : &str)->Option<(u32,&str)>{
+    if !s.chars().next()?.is_ascii_digit(){
+        return None;
+    }
+    let (i,val) = 
+        s.char_indices()
+        .take_while(|(_,c)|c.is_ascii_digit())
+        .fold((0,0), |(idx,val),(i,c)|{
+            (i,val*10+(c as u32 - '0' as u32))
+        });
+    Some((val,&s[i+1..]))
 }

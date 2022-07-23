@@ -225,7 +225,7 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
                 }else{
                     ChordKind::Major
                 },
-            modifier : mods,
+            modifiers : mods,
             bass,
             time
         });

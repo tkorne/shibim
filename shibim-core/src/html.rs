@@ -268,7 +268,7 @@ markup::define!(
         @if let base::ChordKind::Minor = chord.kind{
             $ "u-n"{"m"}
         }
-        @for modifier in &chord.modifier{
+        @for modifier in &chord.modifiers{
             {ChordModifier{modifier}}
         }
         @if let Some(bass) = chord.bass{

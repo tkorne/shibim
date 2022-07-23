@@ -115,7 +115,7 @@ pub struct ChordEvent{
     pub root : NoteHeight,
     pub bass : Option<NoteHeight>,
     pub kind : ChordKind,
-    pub modifier : Vec<ChordModifier>,
+    pub modifiers : Vec<ChordModifier>,
     pub time : Option<TimeOffset>
 }
 
