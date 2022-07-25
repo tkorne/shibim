@@ -9,6 +9,31 @@ use shibim_parse::parse_song;
 
 pub fn read_shb(file_name : &Path) -> 
     Result<Song,LoadError>{
+    println!("{}",file_name.to_string_lossy());
+    let mut session = shibim_base::SongSessionInfo{cur_file:Some(file_name.to_owned())};
+    let u = fs::read_to_string(file_name);
+    let u = u.map_err(|e|
+        LoadError{
+            file : file_name.to_string_lossy().to_string(),
+            detail : LoadErrorPayload::IOError(e)
+        }
+    );
+    u.and_then(|s|{
+            let (song,errs) = crate::parser::parse_shb(&s);
+            if !errs.is_empty() {
+                Err(LoadError{
+                    file : file_name.to_string_lossy().to_string(),
+                    detail : LoadErrorPayload::ParseError(errs)
+                })
+            }else{
+                Ok(song)
+            }
+        }
+    )
+}   
+
+pub fn read_shb_old(file_name : &Path) -> 
+    Result<Song,LoadError>{
     let mut session = shibim_base::SongSessionInfo{cur_file:Some(file_name.to_owned())};
     let u = fs::read_to_string(file_name);
     let u = u.map_err(|e|
@@ -27,7 +52,6 @@ pub fn read_shb(file_name : &Path) ->
         )
     )
 }   
-
 
 
 fn get_dir_filelist_ext(dir : &Path,req_ext : &OsStr) -> 

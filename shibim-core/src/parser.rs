@@ -65,7 +65,7 @@ pub struct SHBParser{
 impl Default for SHBParser {
     fn default() -> Self {
         SHBParser{
-            line : 0,
+            line : 1,
             byte_offset : 0,
             errors : Vec::new(),
             line_has_content : false,
@@ -82,6 +82,15 @@ impl Default for SHBParser {
         }
     }
 }
+//Just to keep consistency
+macro_rules! consume_cls {
+    ($sel:expr) => {
+        {
+            $sel.clear();
+        }
+    };
+}
+
 macro_rules! consume {
     ($sel:expr) => {
         {
@@ -170,7 +179,7 @@ impl SHBParser{
         
         while retry {
             retry = false;
-            println!("{}→{:?}",c,self.state);
+            //println!("Line:{} Char:{:?} State:{:?}",self.line,c,self.state);
             match self.state{
                 MetaStart => match c{
                     _ if c.is_whitespace()=>{
@@ -224,21 +233,39 @@ impl SHBParser{
                         }
                         match trim_arg{
                             "name" =>{
-                                self.song.name = trim_val.to_owned();
+                                self.song.name = consume_str!(self.meta_val_buffer,trim_val);
+                                consume_cls!(self.meta_arg_buffer);
                             }
                             "tonic"=>{
                                 if let Some((root, min)) = parse_tonality(trim_val){
-                                    
+                                    self.song.tonic = root;
+                                    self.song.tonic_kind = min;
+                                }else{
+                                    let err_offset = self.byte_offset-self.meta_val_buffer.len();
+                                    self.errors.push(SHBParseError{
+                                        loc : (err_offset..self.byte_offset),
+                                        line : self.line,
+                                        kind : SHBErrorKind::WrongTonicFormat
+                                    })
                                 }
+                                consume_cls!(self.meta_arg_buffer);
+                                consume_cls!(self.meta_val_buffer);
+                                
+                            }
+                            "bpm"=>{
+                                if let Ok(bpm) = trim_val.parse::<f32>(){
+                                    self.song.bpm = Some(bpm);
+                                }
+                                consume_cls!(self.meta_arg_buffer);
+                                consume_cls!(self.meta_val_buffer);
                             }
                             _ => {
-
+                                self.song.metadata.insert(
+                                    consume_str!(self.meta_arg_buffer,trim_arg),
+                                    consume_str!(self.meta_val_buffer,trim_val)
+                                );
                             }
                         }
-                        self.song.metadata.insert(
-                            consume_str!(self.meta_arg_buffer,trim_arg),
-                            consume_str!(self.meta_val_buffer,trim_val)
-                        );
                         self.state = MetaStart;
                     }
                 
@@ -263,7 +290,7 @@ impl SHBParser{
                         }
                         last_section!(self).name =
                             consume_str!(self.section_id_buffer,id_trim);
-                        self.state = LineStart;
+                        self.state = SubsectionStart;
                     }
                     _ if c.is_whitespace() => {
                         let id_trim = self.section_id_buffer.trim();
@@ -365,6 +392,7 @@ impl SHBParser{
                             })
                         }
                         buffer_block!(self).0 = events;
+                        consume_cls!(self.chord_buffer);
                         self.state = TrueLyricBlock;
                     }
                     '|' => {
@@ -405,9 +433,6 @@ impl SHBParser{
                     '\n' => {
                         buffer_block!(self).1.push(
                             LyricEvent::LyricText(consume!(self.lyric_buffer))
-                        );
-                        buffer_block!(self).0.push(
-                            MusicEvent::Annotation(consume!(self.chord_buffer)) //TODO: STUB
                         );
                         
                         self.state = LineEnd;
@@ -552,6 +577,7 @@ impl SHBParser{
         }else if !c.is_whitespace(){
             self.line_has_content = true;
         }
+
         self.byte_offset += c.len_utf8();
     }
     pub fn parse_str(&mut self, s: &str){
@@ -565,10 +591,18 @@ impl SHBParser{
             self.status = ParserStatus::Completed;
         }
     }
-    pub fn extract(self)->Song{
+    pub fn extract(self)->(Song,Vec<SHBParseError>){
+        (self.song,self.errors)
+    }
+    pub fn extract_song(self)->Song{
         self.song
     }
 } 
+pub fn parse_shb(song : &str)->(Song,Vec<SHBParseError>){
+    let mut parser = SHBParser::default();
+    parser.parse_str(song);
+    parser.extract()
+}
 
 pub fn parse_tone_root(s : &str)->Option<(u8,&str)>{
     let mut it = s.chars();
@@ -644,6 +678,9 @@ pub fn parse_chord<'i>(s : &'i str)->Option<(ChordEvent,&'i str)>{
         }
         _=>{}
     }
+   if s.starts_with('?'){
+    s = &s[1..]; //Todo: Deprecated notation
+   }
     Some(
         (ChordEvent{
             root,
@@ -752,16 +789,19 @@ pub fn parse_time_offset(s: &str)->Option<(TimeOffset,&str)>{
     let mut s = s;
     let first_char =  s.chars().next()?;
     let mut neg:i8 = 1;
-    if first_char == '<' {
-        return Some((TimeOffset{
-            beat : -1,
-            num : 1,
-            den : 2
-        },&s[1..]));
-    }
-    if first_char == '-'{
-        neg = -1;
-        s = &s[1..];
+    match first_char {
+        '<' => {
+            return Some((TimeOffset{
+                beat : -1,
+                num : 1,
+                den : 2
+            },&s[1..]));
+        },
+        '-' => {
+            neg = -1;
+            s = &s[1..];
+        }
+        _=>{}
     }
     let (beat,s) = parse_uint_until(s)?;
     let beat = ((beat % 128) as i8)*neg;
@@ -774,10 +814,17 @@ pub fn parse_time_offset(s: &str)->Option<(TimeOffset,&str)>{
                         beat,
                         num : num as u8,
                         den : den as u8
-                    },s))
+                    },s));
                 }
             }
         }
+    }else if let Some('\'') = s.chars().next(){
+        let s = &s[1..];
+        return Some((TimeOffset{
+            beat,
+            num : 1,
+            den : 2
+        },s));
     }
 
     Some((TimeOffset{
@@ -826,7 +873,10 @@ pub fn parse_keyword<'i>(s : &'i str) -> Option<(ChordModifier,&'i str)>{
         "9" => Keyword(K9), //woof
         "7" => Keyword(K7),
         "6" => Keyword(K6),
-        "5" => Keyword(K5)
+        "5" => Keyword(K5),
+        "M" => Keyword(Maj), //Todo, maybe distinguish shortened versions
+        "+" => Keyword(Aug),
+        "°" => Keyword(Dim)
     ){
         return Some(u)
     }

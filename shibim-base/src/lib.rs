@@ -243,7 +243,8 @@ pub enum SHBErrorKind{
     UnexpectedChar(char),
     MissingSectionID,
     RepeatedDot,
-    NoMetaValue(String)
+    NoMetaValue(String),
+    WrongTonicFormat,
 }
 #[derive(Debug)]
 pub enum ParseSongWarnings{
