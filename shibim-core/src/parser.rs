@@ -1,5 +1,24 @@
 use shibim_base::*;
 
+macro_rules! seek_cascade {
+
+    ($s:expr, $key:expr => $value:expr ) => {
+        {
+            seek($s,$key).map(|ns|($value,ns))
+        }
+    };
+
+    ($s:expr, $key:expr => $value:expr, $($k:expr => $v:expr),+ ) => {
+        {
+            if let Some(ns) = seek($s,$key){
+                Some(($value,ns))
+            }else{
+                seek_cascade!($s,$($k => $v),+)
+            }
+        }
+    };
+}
+
 #[derive(PartialEq,Eq,Debug)]
 enum ParsingState{
     MetaStart,
@@ -606,19 +625,104 @@ pub fn parse_chord<'i>(s : &'i str)->Option<(ChordEvent,&'i str)>{
         },s)
     )
 }
+pub fn parse_literal(s : &str)->Option<(String,&str)>{
+    if !s.starts_with('"'){
+        return None;
+    }
+    let mut s = &s[1..];
+    let close_idx = s.find('"')?;
+    Some((s[..close_idx].to_owned(),&s[close_idx+1..]))
+}
+pub fn parse_music_block(s:&str)->(Vec<MusicEvent>,&str,Vec<SHBParseError>){
+    let mut out = Vec::new();
+    let mut err = Vec::new();
+    let mut s = s.trim();
+    let orig_size = s.len();
+    while !s.is_empty(){
+        if s.starts_with('*')|| s.starts_with('·'){
+            s = &s[1..];
+            break;
+        }
+        if let Some ((evt,ns)) = parse_music_event(s){
+            s = ns.trim_start();
+            out.push(evt);
+        }else if let Some(i) = s.find(|c:char|c.is_whitespace()){
+            let err_start = orig_size-s.len();
+            err.push(SHBParseError{
+                loc : (err_start..err_start+i),
+                line : None,
+                kind : SHBErrorKind::MalformedMusicEvent(s[..i].to_owned())
+            });
+            s = s[i..].trim_start();
+        }else{
+                break;
+        }
+    }
+    (out,s,err)
+}
+pub fn parse_music_event(s:&str)->Option<(MusicEvent,&str)>{
+    if let Some((chord,ns)) = parse_chord(s){
+        return Some((MusicEvent::ChordEvent(chord),ns));
+    }
+    if let Some((melody,ns)) = parse_simple_melody(s){
+        return Some((MusicEvent::MelodyEvent(melody),ns));
+    }
+    if let Some((i,ns)) = parse_uint_until(s){
+        return Some((MusicEvent::NumberedMeasure(i as u16),ns));
+    }
+    if let Some((lit,ns))= parse_literal(s){
+        return Some((MusicEvent::Annotation(lit),ns));
+    }
+    if let Some(u) = seek_cascade!(s,
+        ":-" => MusicEvent::StartRepeat,
+        "-:" => MusicEvent::EndRepeat,
+        "(" => MusicEvent::OpenParen,
+        ")" => MusicEvent::CloseParen,
+        "%" =>MusicEvent::RepeatMeasure
+    ){
+        return Some(u);
+    }
+    None
+}
+
+pub fn parse_simple_melody(s:&str)->Option<(Vec<u8>,&str)>{
+    let mut s = s;
+    let mut melody = Vec::<NoteHeight>::new();
+    if !s.starts_with('[') {
+        return None;
+    }
+    s = &s[1..];
+    while !s.is_empty(){
+        if s.starts_with(' '){
+            s = &s[1..];
+            continue;
+        }
+        if s.starts_with(']'){
+            s = &s[1..];
+            return Some((melody,s));
+        }
+        if let Some((root,ns))= parse_tone_root(s){
+            s = ns;
+            melody.push(root);
+        }else{
+            break;
+        }
+    }
+    None
+}
 
 pub fn parse_time_offset(s: &str)->Option<(TimeOffset,&str)>{
     let mut s = s;
-    let cur_char =  s.chars().next()?;
+    let first_char =  s.chars().next()?;
     let mut neg:i8 = 1;
-    if cur_char == '<' {
+    if first_char == '<' {
         return Some((TimeOffset{
             beat : -1,
             num : 1,
             den : 2
         },&s[1..]));
     }
-    if cur_char == '-'{
+    if first_char == '-'{
         neg = -1;
         s = &s[1..];
     }

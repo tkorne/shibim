@@ -232,7 +232,18 @@ impl<'i> std::convert::From<&'i CompiledSong> for SongRef<'i>{
 #[derive(Debug)]
 pub struct  SHBParseError{
     pub loc : std::ops::Range<usize>,
-    pub msg : String
+    pub line : Option<usize>,
+    pub kind : SHBErrorKind
+}
+#[derive(Debug)] 
+pub enum SHBErrorKind{
+    MalformedMusicEvent(String),
+    RepeatedSectionName(String),
+    SectionNotFound(String),
+    UnexpectedChar(char),
+    MissingSectionID,
+    RepeatedDot,
+    NoMetaValue(String)
 }
 #[derive(Debug)]
 pub enum ParseSongWarnings{
