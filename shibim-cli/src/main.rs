@@ -29,5 +29,4 @@ The other |line |C·is ^chord only
 This is ^lyric only
 "#);
     println!("{:#?}",u.extract());
-    println!("{:#?}",core::parser::parse_music_block("q r ro rominhood 5+7,2Dm7b5add2#11/G# po G# F# \"hah\" "));
 }

@@ -512,7 +512,7 @@ pub fn parse_song(s: &str,session : &mut SongSessionInfo) -> std::result::Result
             println!("{:?}",s);
             SHBParseError{
                 loc : e.span(),
-                line : None,
+                line : 0,
                 kind : SHBErrorKind::MalformedMusicEvent(s[e.span()].to_owned())
             }
         }).collect()

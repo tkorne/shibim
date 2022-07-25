@@ -47,6 +47,8 @@ enum ParserStatus{
 }
 pub struct SHBParser{
     line : usize,
+    byte_offset : usize,
+    errors : Vec<SHBParseError>,
     line_has_content : bool,
     meta_arg_buffer : String,
     meta_val_buffer : String,
@@ -64,6 +66,8 @@ impl Default for SHBParser {
     fn default() -> Self {
         SHBParser{
             line : 0,
+            byte_offset : 0,
+            errors : Vec::new(),
             line_has_content : false,
             meta_arg_buffer : String::new(),
             meta_val_buffer : String::new(),
@@ -160,6 +164,7 @@ impl SHBParser{
         let mut retry = true;
 
         if c == '\r'{
+            self.byte_offset += 1;
             return; //Do nothing   
         }
         
@@ -216,6 +221,19 @@ impl SHBParser{
                         let trim_val = self.meta_val_buffer.trim();
                         if trim_val.is_empty(){
                             eprintln!("Empty metadata value");
+                        }
+                        match trim_arg{
+                            "name" =>{
+                                self.song.name = trim_val.to_owned();
+                            }
+                            "tonic"=>{
+                                if let Some((root, min)) = parse_tonality(trim_val){
+                                    
+                                }
+                            }
+                            _ => {
+
+                            }
                         }
                         self.song.metadata.insert(
                             consume_str!(self.meta_arg_buffer,trim_arg),
@@ -331,6 +349,22 @@ impl SHBParser{
                     }
                     '·'| '*' =>{
                         std::mem::swap(&mut self.lyric_buffer, &mut self.chord_buffer);
+                        let (events, remainder, mut c_errors) = parse_music_block(&self.chord_buffer);
+                        let err_offset = self.byte_offset - self.chord_buffer.len();
+                        for err in &mut c_errors{
+                            err.loc.start += err_offset;
+                            err.loc.end += err_offset;
+                            err.line = self.line;
+                        }
+                        self.errors.append(&mut c_errors);
+                        if !remainder.is_empty(){
+                            self.errors.push(SHBParseError{
+                                loc : (err_offset..self.byte_offset),
+                                line : self.line,
+                                kind : SHBErrorKind::MalformedMusicEvent(remainder.to_owned())
+                            })
+                        }
+                        buffer_block!(self).0 = events;
                         self.state = TrueLyricBlock;
                     }
                     '|' => {
@@ -351,17 +385,11 @@ impl SHBParser{
                         buffer_block!(self).1.push(
                             LyricEvent::LyricText(consume!(self.lyric_buffer))
                         );
-                        buffer_block!(self).0.push(
-                            MusicEvent::Annotation(consume!(self.chord_buffer)) //TODO: STUB
-                        );
                         self.state = MeasureStart;
                     }
                     '´' | '`' =>{
                         buffer_block!(self).1.push(
                             LyricEvent::LyricText(consume!(self.lyric_buffer))
-                        );
-                        buffer_block!(self).0.push(
-                            MusicEvent::Annotation(consume!(self.chord_buffer)) //TODO: STUB
                         );
                         self.state = BlockStart;
                     }
@@ -524,6 +552,7 @@ impl SHBParser{
         }else if !c.is_whitespace(){
             self.line_has_content = true;
         }
+        self.byte_offset += c.len_utf8();
     }
     pub fn parse_str(&mut self, s: &str){
         for c in s.chars(){
@@ -625,11 +654,19 @@ pub fn parse_chord<'i>(s : &'i str)->Option<(ChordEvent,&'i str)>{
         },s)
     )
 }
+pub fn parse_tonality(s : &str)->Option<(NoteHeight,TonicKind)>{
+    let (root,s) = parse_tone_root(s)?;
+    let mut kind = TonicKind::Major;
+    if s.starts_with('m'){
+        kind = TonicKind::Minor;
+    }
+    Some((root,kind))
+}
 pub fn parse_literal(s : &str)->Option<(String,&str)>{
     if !s.starts_with('"'){
         return None;
     }
-    let mut s = &s[1..];
+    let s = &s[1..];
     let close_idx = s.find('"')?;
     Some((s[..close_idx].to_owned(),&s[close_idx+1..]))
 }
@@ -650,7 +687,7 @@ pub fn parse_music_block(s:&str)->(Vec<MusicEvent>,&str,Vec<SHBParseError>){
             let err_start = orig_size-s.len();
             err.push(SHBParseError{
                 loc : (err_start..err_start+i),
-                line : None,
+                line : 0,
                 kind : SHBErrorKind::MalformedMusicEvent(s[..i].to_owned())
             });
             s = s[i..].trim_start();

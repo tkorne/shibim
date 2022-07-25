@@ -232,7 +232,7 @@ impl<'i> std::convert::From<&'i CompiledSong> for SongRef<'i>{
 #[derive(Debug)]
 pub struct  SHBParseError{
     pub loc : std::ops::Range<usize>,
-    pub line : Option<usize>,
+    pub line : usize,
     pub kind : SHBErrorKind
 }
 #[derive(Debug)] 
