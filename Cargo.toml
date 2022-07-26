@@ -1,7 +1,5 @@
 [workspace]
 members = [
-    "shibim-base",
-    "shibim-parse",
     "shibim-cli",
     "shibim-core"
 ]

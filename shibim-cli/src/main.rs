@@ -1,8 +1,5 @@
-extern crate shibim_parse;
-extern crate shibim_base;
 extern crate shibim_core as core;
 use std::path::Path;
-use shibim_base::*;
 fn main(){
     
     match core::files::process_shb_dir(Path::new("shb")){
@@ -10,24 +7,14 @@ fn main(){
             println!("{}",e);
         }
         Ok(uk) =>{
-            println!("{:?}",uk.errors);
-        }
-    } 
-    let mut u = core::parser::SHBParser::default();
-    /*
-    u.parse_str(
-r#"
-name : THE NAME
-tonic : Bm
+            for (path,song) in &uk.songs{
+                println!("{:?} {}",path,song.name);
+                std::fs::write(std::path::Path::new("test").join(path),core::html::Song{
+                    song : &song
+                }.to_string());
+            }
 
-@E1 The section title
-Ya |C·ye yi yo |lines
----
-A| some lyrics |G·on new subsection
-@E2 Some other section
-|Dm·`G· |Dm ·`G·
-The other |line |C·is ^chord only
-This is ^lyric only
-"#);*/
-    //println!("{:#?}",u.extract());
+        }
+    }
 }
+

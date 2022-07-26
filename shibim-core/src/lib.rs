@@ -1,6 +1,6 @@
 extern crate markup;
 extern crate lazy_static;
-extern  crate serde_json;
+extern crate rkyv;
 pub mod i18n;
 pub mod html;
 pub mod toneutil;
@@ -8,3 +8,4 @@ pub mod files;
 pub mod error;
 pub mod util;
 pub mod parser;
+pub mod base;

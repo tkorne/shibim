@@ -1,4 +1,4 @@
-use shibim_base::*;
+use crate::base::*;
 pub fn is_altered(a : NoteHeight) -> bool{
     let a  = a % 12;
     if a < 5 {

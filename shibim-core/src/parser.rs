@@ -1,4 +1,4 @@
-use shibim_base::*;
+use crate::base::*;
 
 macro_rules! seek_cascade {
 
@@ -57,6 +57,7 @@ pub struct SHBParser{
     lyric_buffer :String,
     chord_buffer : String,
     line_buffer : Vec<Vec<(Vec<MusicEvent>,Vec<LyricEvent>)>>,
+    last_line_buffer : String,
     state : ParsingState,
     status : ParserStatus,
     song : Song
@@ -73,6 +74,7 @@ impl Default for SHBParser {
             meta_val_buffer : String::new(),
             section_id_buffer : String::new(),
             section_desc_buffer : String::new(),
+            last_line_buffer : String::new(),
             line_buffer : Vec::new(),
             lyric_buffer : String::new(),
             chord_buffer : String::new(),
@@ -135,6 +137,27 @@ macro_rules! buffer_block {
     };
 }
 
+macro_rules! push_error{
+    ($self:expr,$start_off:expr,$end_off:expr,$data:expr) => {
+        $self.errors.push(SHBParseError{
+            loc : ($self.byte_offset - $start_off..$self.byte_offset - $end_off),
+            line : $self.line,
+            kind : $data,
+            context : None
+        })
+    };
+}
+
+macro_rules! unexpected_char{
+    ($self:expr,$c:expr) =>{
+        push_error!(
+            $self,
+            1,
+            0,
+            SHBErrorKind::UnexpectedChar($c)
+        )
+    }
+}
 macro_rules! parse_lyric_buffer {
     ($self:expr) => {
         {
@@ -176,6 +199,7 @@ impl SHBParser{
             self.byte_offset += 1;
             return; //Do nothing   
         }
+        self.last_line_buffer.push(c);
         
         while retry {
             retry = false;
@@ -207,7 +231,13 @@ impl SHBParser{
                         self.state = MetaVal;
                     }
                     '\n' =>{
-                        eprintln!("Metadata '{}' without assigned value",self.meta_arg_buffer);
+                        //eprintln!("Metadata '{}' without assigned value",self.meta_arg_buffer);
+                        push_error!(
+                            self,
+                            0,
+                            0,
+                            SHBErrorKind::NoMetaValue(self.meta_arg_buffer.trim().to_string())
+                        );
                         self.meta_arg_buffer.clear();
                         self.state = MetaStart;
                     }
@@ -218,7 +248,8 @@ impl SHBParser{
                         self.meta_arg_buffer.push(c);
                     }
                     _=>{
-                        eprintln!("Unexpected character {}",c)
+                        unexpected_char!(self,c);
+                        //eprintln!("Unexpected character {}",c)
                     }
                 },
                 MetaVal => match c {
@@ -241,12 +272,11 @@ impl SHBParser{
                                     self.song.tonic = root;
                                     self.song.tonic_kind = min;
                                 }else{
-                                    let err_offset = self.byte_offset-self.meta_val_buffer.len();
-                                    self.errors.push(SHBParseError{
-                                        loc : (err_offset..self.byte_offset),
-                                        line : self.line,
-                                        kind : SHBErrorKind::WrongTonicFormat
-                                    })
+                                    push_error!(self,
+                                        self.meta_val_buffer.len(),
+                                        0,
+                                        SHBErrorKind::WrongTonicFormat);
+                                    
                                 }
                                 consume_cls!(self.meta_arg_buffer);
                                 consume_cls!(self.meta_val_buffer);
@@ -286,7 +316,13 @@ impl SHBParser{
                     '\n' => {
                         let id_trim = self.section_id_buffer.trim();
                         if id_trim.is_empty(){
-                            eprintln!("Empty section name")
+                            push_error!(
+                                self,
+                                self.section_id_buffer.len(),
+                                1,
+                                SHBErrorKind::MissingSectionID
+                            );
+                            //eprintln!("Empty section name")
                         }
                         last_section!(self).name =
                             consume_str!(self.section_id_buffer,id_trim);
@@ -295,7 +331,13 @@ impl SHBParser{
                     _ if c.is_whitespace() => {
                         let id_trim = self.section_id_buffer.trim();
                         if id_trim.is_empty(){
-                            eprintln!("Empty section name")
+                            //eprintln!("Empty section name")
+                            push_error!(
+                                self,
+                                self.section_id_buffer.len(),
+                                1,
+                                SHBErrorKind::MissingSectionID
+                            );
                         }
                         last_section!(self).name =
                             consume_str!(self.section_id_buffer,id_trim);
@@ -308,7 +350,8 @@ impl SHBParser{
                         self.section_id_buffer.push(c);
                     }
                     _ =>{
-                        eprintln!("unexpected {}",c);
+                        unexpected_char!(self,c);
+                        //eprintln!("unexpected {}",c);
                     }
                 }
                 
@@ -385,11 +428,10 @@ impl SHBParser{
                         }
                         self.errors.append(&mut c_errors);
                         if !remainder.is_empty(){
-                            self.errors.push(SHBParseError{
-                                loc : (err_offset..self.byte_offset),
-                                line : self.line,
-                                kind : SHBErrorKind::MalformedMusicEvent(remainder.to_owned())
-                            })
+                            push_error!(self,
+                                self.chord_buffer.len(),
+                                0,
+                                SHBErrorKind::MalformedMusicEvent(remainder.to_owned()));
                         }
                         buffer_block!(self).0 = events;
                         consume_cls!(self.chord_buffer);
@@ -422,7 +464,12 @@ impl SHBParser{
                         self.state = BlockStart;
                     }
                     '·' | '*' =>{
-                        eprintln!("Error, repeated · or *");
+                        push_error!(
+                            self,
+                            1,
+                            0,
+                            SHBErrorKind::RepeatedDot
+                        );
                     }
                     '^' => {
                         buffer_block!(self).1.push(
@@ -524,7 +571,8 @@ impl SHBParser{
                     '-' => {}
                     _ if c.is_whitespace() => {}
                     _ =>{
-                        eprint!("Unexpected {}",c)
+                        unexpected_char!(self,c);
+                        //eprint!("Unexpected {}",c)
                     }
                 }
                 SubsectionMetaArg => match c{
@@ -543,7 +591,8 @@ impl SHBParser{
                         self.meta_arg_buffer.push(c);
                     }
                     _=>{
-                        eprintln!("Unexpected character {}",c)
+                        unexpected_char!(self,c);
+                        //eprintln!("Unexpected character {}",c)
                     }
                 }
                 SubsectionMetaVal => match c {
@@ -551,10 +600,22 @@ impl SHBParser{
                         let trim_arg = self.meta_arg_buffer.trim();
                         if trim_arg.is_empty(){
                             eprintln!("Empty metadata name");
+                            push_error!(
+                                self,
+                                0,
+                                0,
+                                SHBErrorKind::NoMetaName
+                            )
                         }
                         let trim_val = self.meta_val_buffer.trim();
                         if trim_val.is_empty(){
                             eprintln!("Empty metadata value");
+                            push_error!(
+                                self,
+                                0,
+                                0,
+                                SHBErrorKind::NoMetaValue(trim_arg.to_string())
+                            );
                         }
                         last_subsection!(self).metadata.insert(
                             consume_str!(self.meta_arg_buffer,trim_arg),
@@ -574,10 +635,13 @@ impl SHBParser{
         if c == '\n'{
             self.line += 1;
             self.line_has_content = false;
+            self.errors.iter_mut().rev().take_while(|e|e.context.is_none()).for_each(|e|{
+                e.context = Some(self.last_line_buffer[..self.last_line_buffer.len()-1].to_string())
+            });
+            self.last_line_buffer.clear();
         }else if !c.is_whitespace(){
             self.line_has_content = true;
         }
-
         self.byte_offset += c.len_utf8();
     }
     pub fn parse_str(&mut self, s: &str){
@@ -637,7 +701,7 @@ pub fn parse_tone_root(s : &str)->Option<(u8,&str)>{
 }
 
 //This one is ugly, maybe refactor
-pub fn parse_chord<'i>(s : &'i str)->Option<(ChordEvent,&'i str)>{
+pub fn parse_chord(s : &str)->Option<(ChordEvent, &str)>{
     let mut s = s;
     let mut time = None;
     if let Some((ntime,ns)) = parse_time_offset(s){
@@ -725,7 +789,8 @@ pub fn parse_music_block(s:&str)->(Vec<MusicEvent>,&str,Vec<SHBParseError>){
             err.push(SHBParseError{
                 loc : (err_start..err_start+i),
                 line : 0,
-                kind : SHBErrorKind::MalformedMusicEvent(s[..i].to_owned())
+                kind : SHBErrorKind::MalformedMusicEvent(s[..i].to_owned()),
+                context : None
             });
             s = s[i..].trim_start();
         }else{
@@ -852,7 +917,7 @@ macro_rules! seek_cascade {
     };
 }
 
-pub fn parse_keyword<'i>(s : &'i str) -> Option<(ChordModifier,&'i str)>{
+pub fn parse_keyword(s : &str) -> Option<(ChordModifier, &str)>{
     use ChordModifier::*;
     use ChordKeyword::*;
 
@@ -927,7 +992,7 @@ pub fn parse_uint_until(s : &str)->Option<(u32,&str)>{
     let (i,val) = 
         s.char_indices()
         .take_while(|(_,c)|c.is_ascii_digit())
-        .fold((0,0), |(idx,val),(i,c)|{
+        .fold((0,0), |(_idx,val),(i,c)|{
             (i,val*10+(c as u32 - '0' as u32))
         });
     Some((val,&s[i+1..]))

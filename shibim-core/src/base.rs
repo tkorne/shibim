@@ -229,13 +229,14 @@ impl<'i> std::convert::From<&'i CompiledSong> for SongRef<'i>{
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct  SHBParseError{
     pub loc : std::ops::Range<usize>,
     pub line : usize,
-    pub kind : SHBErrorKind
+    pub kind : SHBErrorKind,
+    pub context : Option<String>,
 }
-#[derive(Debug)] 
+#[derive(Debug,Clone)] 
 pub enum SHBErrorKind{
     MalformedMusicEvent(String),
     RepeatedSectionName(String),
@@ -244,6 +245,7 @@ pub enum SHBErrorKind{
     MissingSectionID,
     RepeatedDot,
     NoMetaValue(String),
+    NoMetaName,
     WrongTonicFormat,
 }
 #[derive(Debug)]
@@ -261,17 +263,29 @@ pub enum ParseListWarnings{
     FirstJoined,
     UnknownSongArgs(String)
 }
+#[derive(Debug,Default,Clone)]
 pub struct SongSessionInfo{
     pub cur_file : Option<std::path::PathBuf>,
+    pub error_list : Vec<SHBParseError>
 }
 
 impl SongSessionInfo{
-    pub fn emit_warning(&self,warning : ParseSongWarnings){
-        if let Some(cur_file) = &self.cur_file{
-            eprintln!("{}: {:?}",cur_file.display(),warning);
+    pub fn new(cur_file : &std::path::Path)->Self{
+        SongSessionInfo{
+            cur_file : Some(cur_file.to_owned()),
+            error_list : Vec::new()
         }
     }
+    pub fn emit(&mut self,err : SHBParseError){
+        if let Some(cur_file) = &self.cur_file{
+            eprintln!("{}: {:?}",cur_file.display(),err);
+        }else{
+            eprintln!("[text source]: {:?}",err);
+        }
+        self.error_list.push(err);
+    }
 }
+
 /*
 impl std::convert::From<&Song> for SongRef{
     fn from(item: &Song) -> Self{

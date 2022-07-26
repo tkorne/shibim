@@ -6,19 +6,13 @@ edition = "2021"
 [dependencies.markup]
 version = "0.13"
 
-[dependencies.shibim-base]
-path = "../shibim-base"
-version = "0.1.0"
-
-[dependencies.shibim-parse]
-path = "../shibim-parse"
-version = "0.1.0"
-
 [dependencies.lazy_static]
 version = "1.4"
 
-[dependencies.serde_json]
-version = "1.0"
-
 [dependencies.thiserror]
 version = "1.0"
+
+[dependencies.rkyv]
+version = "0.7"
+default-features = false
+features = ["size_32"]

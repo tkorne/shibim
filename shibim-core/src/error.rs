@@ -1,6 +1,5 @@
-use shibim_base::SHBParseError;
+use crate::base::SHBParseError;
 use thiserror::Error;
-use std::path::PathBuf;
 
 #[derive(Error,Debug)]
 #[error("Error loading file '{file}'")]

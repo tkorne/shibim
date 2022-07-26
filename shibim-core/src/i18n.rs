@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use shibim_base::ChordKeyword;
+use crate::base::ChordKeyword;
 lazy_static::lazy_static! {
     pub static ref EN: HashMap<&'static str, &'static str> = {
         HashMap::from([

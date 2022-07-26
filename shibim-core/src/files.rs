@@ -4,13 +4,13 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use crate::util::Itertools;
 use crate::error::{LoadError, LoadErrorPayload, VisitorError};
-use shibim_base::*;
-use shibim_parse::parse_song;
+use rkyv::{Archive, Deserialize, Serialize};
+use crate::base::*;
 
 pub fn read_shb(file_name : &Path) -> 
     Result<Song,LoadError>{
-    println!("{}",file_name.to_string_lossy());
-    let mut session = shibim_base::SongSessionInfo{cur_file:Some(file_name.to_owned())};
+    //println!("{}",file_name.to_string_lossy());
+    //let session = shibim_base::SongSessionInfo::new(file_name);
     let u = fs::read_to_string(file_name);
     let u = u.map_err(|e|
         LoadError{
@@ -29,27 +29,6 @@ pub fn read_shb(file_name : &Path) ->
                 Ok(song)
             }
         }
-    )
-}   
-
-pub fn read_shb_old(file_name : &Path) -> 
-    Result<Song,LoadError>{
-    let mut session = shibim_base::SongSessionInfo{cur_file:Some(file_name.to_owned())};
-    let u = fs::read_to_string(file_name);
-    let u = u.map_err(|e|
-        LoadError{
-            file : file_name.to_string_lossy().to_string(),
-            detail : LoadErrorPayload::IOError(e)
-        }
-    );
-    u.and_then(|s|
-        parse_song(&s,&mut session)
-        .map_err(|e|
-            LoadError{
-                file : file_name.to_string_lossy().to_string(),
-                detail : LoadErrorPayload::ParseError(e)
-            }
-        )
     )
 }   
 
@@ -96,7 +75,7 @@ pub fn process_shb_dir(dir : &Path)->Result<SHBBatchResults,std::io::Error>{
         songs,errors, names
     })
 }
-
+#[derive(Debug)]
 pub struct SHBBatchResults{
     pub songs : Vec<(PathBuf,Song)>,
     pub errors : Vec<LoadError>,
@@ -106,4 +85,8 @@ pub struct SHBBatchResults{
 
 trait SongVisitor{
     fn process(&mut self, e : &Song) -> Result<(),VisitorError>;
+}
+
+pub fn retrieve_or_default_cache(s : &Path)->Result<(),std::io::Error>{
+    Ok(())
 }

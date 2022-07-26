@@ -1,5 +1,5 @@
 use markup;
-use shibim_base as base;
+use crate::base as base;
 use crate::i18n::*;
 use crate::toneutil;
 /* 
@@ -8,14 +8,14 @@ struct SongHTMLOptions{
     remove_edit_buttons : bool,
     force_flats : bool
 }*/
-
+/*
 fn get_orders_serialized(song : & base::Song)->String{
     serde_json::to_string(
         &song.orders.keys()
         .collect::<Vec<&String>>()
     )
     .unwrap_or_default()
-}
+}*/
 
 fn get_default_order(song : &base::Song)->Option<(&str, &Vec<usize>)>{
     song.orders.get_key_value("default")
@@ -33,7 +33,7 @@ markup::define!(
     Song<'i>(song: &'i base::Song){
         article [
                 "data-tonic" = song.tonic,
-                "data-orders" = get_orders_serialized(song),
+                //"data-orders" = get_orders_serialized(song), /* back to the drawing board with this feature */
                 "data-mode" = {
                     if let base::TonicKind::Minor = song.tonic_kind{
                         "m"
