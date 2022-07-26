@@ -4,7 +4,6 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use crate::util::Itertools;
 use crate::error::{LoadError, LoadErrorPayload, VisitorError};
-use rkyv::{Archive, Deserialize, Serialize};
 use crate::base::*;
 
 pub fn read_shb(file_name : &Path) -> 
@@ -83,10 +82,20 @@ pub struct SHBBatchResults{
 }
 
 
+
+
 trait SongVisitor{
     fn process(&mut self, e : &Song) -> Result<(),VisitorError>;
 }
 
 pub fn retrieve_or_default_cache(s : &Path)->Result<(),std::io::Error>{
+    
     Ok(())
 }
+/*
+pub fn save_cache(s : &Song){
+    use rkyv::ser::{serializers::WriteSerializer, Serializer};
+    let bytes = rkyv::to_bytes::<_,256>(s).expect("Internal error; can't serialize cache");
+    let reg = rkyv::from_bytes::<Song>(&bytes);
+}
+*/

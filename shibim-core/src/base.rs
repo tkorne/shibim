@@ -1,7 +1,7 @@
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-
+use serde::{Serialize,Deserialize};
 pub type NoteHeight = u8;
 
 pub const CHAR_TONIC_VALUES:[u8;7] = [9,11,0,2,4,5,7];
@@ -9,27 +9,20 @@ pub const SHARP_TONIC_NAMES:[&str;12] = ["C","C","D","D","E","F","F","G","G","A"
 pub const FLAT_TONIC_NAMES:[&str;12] = ["C","D","D","E","E","F","G","G","A","A","B","B"];
 
 
-#[derive(Debug,Clone,Copy)]
+#[derive(Serialize,Deserialize,Debug,Clone,Copy)]
 pub enum TonicKind{
     Minor,
     Major,
     Undefined
 }
-#[derive(Debug,Clone,Copy)]
+#[derive(Serialize,Deserialize,Debug,Clone,Copy)]
 pub enum ChordKind{
     Minor,
     Major,
     Undefined
 }
-#[derive(Debug)]
-pub enum FormatSize{
-    Smaller,
-    Small,
-    Normal
-}
 
-
-#[derive(Debug,Clone,Default)]
+#[derive(Serialize,Deserialize,Debug,Clone,Default)]
 pub struct Song{
     pub name: String,
     pub tonic : NoteHeight,
@@ -58,14 +51,14 @@ pub struct SongRef<'i> {
     pub bpm : Option<f32>,
     pub sections : &'i Vec<Section>
 }
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct SectionName{
     pub kind : String,
     pub number : u16,
     pub version : String,
 }
 
-#[derive(Debug,Clone,Default)]
+#[derive(Serialize,Deserialize,Debug,Clone,Default)]
 pub struct Section{
     pub name : String,
     pub description : String,
@@ -74,7 +67,7 @@ pub struct Section{
     //pub metadata : HashMap<String,String>
 }
 
-#[derive(Debug,Clone,Default)]
+#[derive(Serialize,Deserialize,Debug,Clone,Default)]
 pub struct Subsection{
     pub metadata : HashMap<String,String>,
     pub lines : Vec<Line>
@@ -85,19 +78,19 @@ pub struct Subsection{
 //Block: Vector of events (or a tuple of vectors)
 type MixedEventList = (Vec<MusicEvent>,Vec<LyricEvent>);
 
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub enum Line{
     Lyrics  (Vec< Vec<  Vec<LyricEvent> >>),
     Chords  (Vec< Vec<  Vec<MusicEvent> >>),
     Mixed   (Vec< Vec< MixedEventList >>)
 }
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub enum LyricEvent{
     LyricText(String),
     LyricBreak
 }
 
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub enum MusicEvent{
     ChordEvent(ChordEvent),
     RepeatMeasure,
@@ -110,7 +103,15 @@ pub enum MusicEvent{
     MelodyEvent(Vec<NoteHeight>)
 }
 
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
+// We can pass attributes through to generated types with archive_attr
+pub enum ChordModifier{
+    Keyword(ChordKeyword),
+    Alteration(ChordAlteration)
+}
+
+
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct ChordEvent{
     pub root : NoteHeight,
     pub bass : Option<NoteHeight>,
@@ -119,7 +120,7 @@ pub struct ChordEvent{
     pub time : Option<TimeOffset>
 }
 
-#[derive(Debug,Clone,PartialEq,Eq,Hash,PartialOrd,Ord)]
+#[derive(Serialize,Deserialize,Debug,Clone,PartialEq,Eq,Hash,PartialOrd,Ord)]
 pub enum ChordKeyword{
     Sus2,
     Sus4,
@@ -139,26 +140,21 @@ pub enum ChordKeyword{
     Dim
 }
 
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub enum ChordAlterationKind{
     Flat,
     Sharp,
     No
 }
 
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct ChordAlteration{
     pub kind : ChordAlterationKind,
     pub degree : u8
 }
 
-#[derive(Debug,Clone)]
-pub enum ChordModifier{
-    Keyword(ChordKeyword),
-    Alteration(ChordAlteration)
-}
 
-#[derive(Debug,Clone)]
+#[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct TimeOffset{
     pub beat: i8,
     pub num : u8,

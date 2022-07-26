@@ -1,6 +1,7 @@
 extern crate markup;
 extern crate lazy_static;
-extern crate rkyv;
+extern crate serde_json;
+extern crate serde;
 pub mod i18n;
 pub mod html;
 pub mod toneutil;
